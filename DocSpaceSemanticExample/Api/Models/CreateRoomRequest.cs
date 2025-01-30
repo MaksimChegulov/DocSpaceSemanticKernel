@@ -4,6 +4,7 @@ public record CreateRoomRequest
 {
     public required string Title { get; init; }
     public required RoomType RoomType { get; init; }
+    public required string Color { get; init; }
 }
 
 public record RoomResponse

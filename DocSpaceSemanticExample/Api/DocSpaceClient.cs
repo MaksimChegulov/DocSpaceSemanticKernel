@@ -7,18 +7,18 @@ public class DocSpaceClient(HttpClient httpClient)
 {
     private const string ApiEndpoint = "api/2.0";
 
-    public async Task<RoomResponse> CreateRoomAsync(string title, RoomType roomType)
+    public async Task<RoomResponse> CreateRoom(string title, RoomType roomType)
     {
         const string exceptionMessage = "Failed to create room";
         
         var request = new CreateRoomRequest
         {
             Title = title,
-            RoomType = roomType
+            RoomType = roomType,
+            Color = "61C059"
         };
 
         var response = await httpClient.PostAsJsonAsync($"{ApiEndpoint}/files/rooms", request);
-        
         if (!response.IsSuccessStatusCode)
         {
             throw new Exception(exceptionMessage);

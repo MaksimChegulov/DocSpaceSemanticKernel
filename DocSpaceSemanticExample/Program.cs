@@ -1,25 +1,30 @@
-﻿using DocSpaceSemanticExample.Api;
+﻿using System.ClientModel;
+using System.Text;
+using DocSpaceSemanticExample.Api;
 using DocSpaceSemanticExample.Plugins;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Ollama;
-using OllamaSharp;
-
-#pragma warning disable SKEXP0001
-#pragma warning disable SKEXP0070
+using Microsoft.SemanticKernel.Connectors.OpenAI;
+using OpenAI;
 
 const string docSpaceUrl = "http://localhost:8092";
 const string authKey = "";
-const string ollamaUrl = "http://localhost:11434";
+const string ollamaUrl = "http://localhost:11434/v1";
 const string modelName = "qwen2.5:7b";
+const string apiKey = "ollama";
 
-using var client = new OllamaApiClient(ollamaUrl, modelName);
+var client = new OpenAIClient(
+    new ApiKeyCredential(apiKey), 
+    new OpenAIClientOptions
+    {
+        Endpoint = new Uri(ollamaUrl)
+    });
 
 var builder = Kernel.CreateBuilder();
-builder.AddOllamaChatCompletion(client);
+builder.AddOpenAIChatCompletion(modelName, client);
 builder.Plugins.AddFromType<RoomsPlugin>();
-builder.Services.TryAddSingleton<DocSpaceClient>(sp =>
+builder.Services.TryAddSingleton<DocSpaceClient>(_ =>
 {
     var httpClient = new HttpClient();
     httpClient.BaseAddress = new Uri(docSpaceUrl);
@@ -34,7 +39,7 @@ var kernel = builder.Build();
 
 var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
 
-var executionSettings = new OllamaPromptExecutionSettings
+var executionSettings = new OpenAIPromptExecutionSettings
 {
     FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
 };
@@ -48,6 +53,8 @@ history.AddSystemMessage("""
                          VirtualDataRoom - for using advanced file security options: set watermarks, automatically index and track all content, restrict downloading and copying.
                          CustomRoom – Apply your own settings to use this room for any custom purpose.
                          """);
+
+var stringBuilder = new StringBuilder();
 
 while (true)
 {
@@ -67,19 +74,20 @@ while (true)
     }
     
     history.AddUserMessage(userMessage);
+    
+    Console.WriteLine();
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine("===========Assistant===========");
+    Console.ResetColor();
 
-    var message = await chatCompletionService.GetChatMessageContentAsync(history, executionSettings, kernel);
-
-    if (!string.IsNullOrEmpty(message.Content))
+    await foreach (var message in chatCompletionService.GetStreamingChatMessageContentsAsync(history, executionSettings, kernel))
     {
-        Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("===========Assistant===========");
-        Console.ResetColor();
-        
-        Console.WriteLine(message.Content);
-        history.AddAssistantMessage(message.Content);
-
-        Console.WriteLine();
+        Console.Write(message);
+        stringBuilder.Append(message);
     }
+    
+    Console.WriteLine();
+    
+    history.AddAssistantMessage(stringBuilder.ToString());
+    stringBuilder.Clear();
 }
